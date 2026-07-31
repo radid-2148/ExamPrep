@@ -1,0 +1,50 @@
+name: Unpack Zip and Build APK
+
+on:
+  push:
+    paths:
+      - '**/*.zip'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find and unzip the project
+        run: |
+          ZIP_FILE=$(find . -maxdepth 2 -iname "*.zip" | head -n 1)
+          echo "Found zip: $ZIP_FILE"
+          mkdir -p extracted
+          unzip -q "$ZIP_FILE" -d extracted
+          ENTRIES=$(ls extracted)
+          COUNT=$(ls extracted | wc -l)
+          if [ "$COUNT" -eq 1 ] && [ -d "extracted/$ENTRIES" ]; then
+            mv "extracted/$ENTRIES" project
+          else
+            mv extracted project
+          fi
+          ls project
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build debug APK
+        working-directory: project
+        run: gradle assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: examprep-debug-apk
+          path: project/app/build/outputs/apk/debug/*.apk
